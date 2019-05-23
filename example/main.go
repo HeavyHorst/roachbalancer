@@ -10,12 +10,13 @@ import (
 )
 
 func main() {
-	b := balancer.New("root", "/certs", false, "163.172.132.105:26257")
-	go b.Listen()
+	b := balancer.New("root", "/certs", false, "xxx.xxx.xxx.xxx:26257")
+	go b.Listen(0) // 0 means random high port
+	b.WaitReady()
 
 	// Connect to the "bank" database.
 	db, err := sql.Open("postgres",
-		"postgresql://maxroach@localhost:26257/bank?ssl=true&sslmode=require&sslrootcert=/certs/ca.crt&sslkey=/certs/client.maxroach.key&sslcert=/certs/client.maxroach.crt")
+		fmt.Sprintf("postgresql://maxroach@%s/bank?ssl=true&sslmode=require&sslrootcert=/certs/ca.crt&sslkey=/certs/client.maxroach.key&sslcert=/certs/client.maxroach.crt", b.GetAddr()))
 	if err != nil {
 		log.Fatal("error connecting to the database: ", err)
 	}

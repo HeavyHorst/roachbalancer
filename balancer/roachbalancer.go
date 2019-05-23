@@ -18,9 +18,12 @@ type Balancer struct {
 	n        uint
 	nodeLock sync.RWMutex
 
+	addr    string
 	certdir string
 	user    string
 	logging bool
+
+	ok chan struct{}
 }
 
 // New creates a new Balancer
@@ -30,6 +33,7 @@ func New(user, certdir string, logging bool, initialNodes ...string) *Balancer {
 		certdir: certdir,
 		user:    user,
 		logging: logging,
+		ok:      make(chan struct{}, 1),
 	}
 
 	ticker := time.NewTicker(30 * time.Second)
@@ -115,13 +119,26 @@ func (b *Balancer) getConnection() (net.Conn, error) {
 	return net.Dial("tcp", b.ChooseNode())
 }
 
-// Listen starts the loadbalancer on 127.0.0.1:26257
-func (b *Balancer) Listen() {
-	ln, err := net.Listen("tcp", "127.0.0.1:26257")
+// GetAddr returns the listener address
+func (b *Balancer) GetAddr() string {
+	return b.addr
+}
+
+// WaitReady blocks until Listen is ready
+func (b *Balancer) WaitReady() {
+	<-b.ok
+}
+
+// Listen starts the loadbalancer
+func (b *Balancer) Listen(port int) {
+	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 	if err != nil {
 		log.Fatalf("failed to bind: %s", err)
 	}
 
+	b.addr = ln.Addr().String()
+
+	b.ok <- struct{}{}
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
