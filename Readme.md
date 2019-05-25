@@ -1,5 +1,5 @@
 
-<a href="https://github.com/HeavyHorst/roachbalancer"><img src="https://img.shields.io/badge/api-reference-blue.svg?style=flat-square" alt="GoDoc"></a>
+<a href="https://godoc.org/github.com/HeavyHorst/roachbalancer/balancer"><img src="https://img.shields.io/badge/api-reference-blue.svg?style=flat-square" alt="GoDoc"></a>
 
 
 # roachbalancer
