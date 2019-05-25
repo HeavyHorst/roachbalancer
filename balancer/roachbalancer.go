@@ -131,7 +131,7 @@ func (b *Balancer) WaitReady() {
 
 // Listen starts the loadbalancer
 func (b *Balancer) Listen(port int) {
-	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		log.Fatalf("failed to bind: %s", err)
 	}
