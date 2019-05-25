@@ -21,5 +21,6 @@ func  main()  {
 ### Use the binary
 
 ```
-./roachbalancer -certs-dir /certs -node xxx.xxx.xxx.xxx:26257
+./roachbalancer -certs-dir /certs -node xxx.xxx.xxx.xxx:26257 -node xxx.xxx.xxx.xxx:26257
+
 ```
