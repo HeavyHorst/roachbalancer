@@ -39,11 +39,7 @@ func New(user, certdir string, logging bool, initialNodes ...string) *Balancer {
 	ticker := time.NewTicker(30 * time.Second)
 	go func() {
 		for ; true; <-ticker.C {
-			err := b.refreshLiveNodes()
-			if err != nil {
-				log.Println("[ERROR]:", err)
-			}
-
+			b.refreshLiveNodes()
 			if b.logging {
 				log.Println("Refreshed active node list: ", b.GetLiveNodes())
 			}
@@ -76,15 +72,27 @@ func (b *Balancer) GetLiveNodes() []string {
 	return nodes
 }
 
-func (b *Balancer) refreshLiveNodes() error {
-	db, err := sql.Open("postgres",
-		fmt.Sprintf("postgresql://%s@%s/defaultdb?ssl=true&sslmode=require&sslrootcert=%s/ca.crt&sslkey=%s/client.%s.key&sslcert=%s/client.%s.crt", b.user, b.ChooseNode(), b.certdir, b.certdir, b.user, b.certdir, b.user))
-	if err != nil {
-		return err
-	}
-	defer db.Close()
+// GetNodeCount returns the current live node count.
+func (b *Balancer) GetNodeCount() int {
+	b.nodeLock.RLock()
+	defer b.nodeLock.RUnlock()
 
-	rows, err := db.Query(`select address from 
+	return len(b.nodes)
+}
+
+func (b *Balancer) refreshLiveNodes() {
+	c := b.GetNodeCount()
+
+	for i := 0; i < c; i++ {
+		db, err := sql.Open("postgres",
+			fmt.Sprintf("postgresql://%s@%s/defaultdb?connect_timeout=5&ssl=true&sslmode=require&sslrootcert=%s/ca.crt&sslkey=%s/client.%s.key&sslcert=%s/client.%s.crt", b.user, b.ChooseNode(), b.certdir, b.certdir, b.user, b.certdir, b.user))
+		if err != nil {
+			log.Println("[ERROR]:", err)
+			continue
+		}
+		defer db.Close()
+
+		rows, err := db.Query(`select address from 
 		(select address, 
 			CASE WHEN split_part(expiration,',',1)::decimal > now()::decimal 
 			THEN true 
@@ -93,26 +101,32 @@ func (b *Balancer) refreshLiveNodes() error {
 			FROM crdb_internal.gossip_liveness 
 			LEFT JOIN crdb_internal.gossip_nodes USING (node_id)
 		) as a WHERE a.is_available = true;`)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	var newNodes []string
-	for rows.Next() {
-		var addr string
-		if err := rows.Scan(&addr); err != nil {
-			return err
+		if err != nil {
+			log.Println("[ERROR]:", err)
+			continue
 		}
-		newNodes = append(newNodes, addr)
-	}
+		defer rows.Close()
 
-	if len(newNodes) > 0 {
-		b.nodeLock.Lock()
-		defer b.nodeLock.Unlock()
-		b.nodes = newNodes
+		var newNodes []string
+		for rows.Next() {
+			var addr string
+			if err := rows.Scan(&addr); err != nil {
+				continue
+			}
+			newNodes = append(newNodes, addr)
+		}
+
+		rows.Close()
+		db.Close()
+
+		if len(newNodes) > 0 {
+			b.nodeLock.Lock()
+			defer b.nodeLock.Unlock()
+			b.nodes = newNodes
+		}
+
+		break
 	}
-	return nil
 }
 
 func (b *Balancer) getConnection() (net.Conn, error) {
