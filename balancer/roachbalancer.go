@@ -163,6 +163,7 @@ func (b *Balancer) Listen(port int) {
 		ds, err := b.getConnection()
 		if err != nil {
 			log.Println("[ERROR]:", err)
+			continue
 		}
 
 		go handleConnection(conn, ds)
